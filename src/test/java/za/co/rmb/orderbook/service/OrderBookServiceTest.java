@@ -52,31 +52,43 @@ public class OrderBookServiceTest {
     Assertions.assertFalse(lowerPriceFound);
   }
 
+  /**
+   * Test if the highest value of the remaining buy orders is at top after a few buy order have been removed from the queue.
+   */
   @Test
-  public void testBuyOrderBookInit() {
-    OrderBook orderBook = orderBookService.getOrderBook();
-    Assertions.assertNotNull(orderBook);
-    orderBook.buyOrders().forEach(System.out::println);
-    System.out.println();
+  public void BUY_ORDER_MAX_VALUE_FIRST_AFTER_POLL_TEST() {
+    // Creating a copy to avoid breaking other tests
+    PriorityQueue<Order> copyOfBuyOrders = new PriorityQueue<>(orderBookService.getOrderBook().buyOrders());
 
     for (int i = 0; i < 3; i++) {
-      orderBook.buyOrders().poll();
-      orderBook.buyOrders().forEach(System.out::println);
-      System.out.println();
+      copyOfBuyOrders.poll();
     }
+
+    Order firstInQueue = copyOfBuyOrders.peek();
+    Assertions.assertNotNull(firstInQueue);
+
+    int maxPrice = firstInQueue.price();
+    boolean higherPriceFound = copyOfBuyOrders.stream().anyMatch(order -> order.price() > maxPrice);
+    Assertions.assertFalse(higherPriceFound);
   }
 
+  /**
+   * Test if the lowest value of the remaining sell orders is at top after a few buy order have been removed from the queue.
+   */
   @Test
-  public void testSellOrderBookInit() {
-    OrderBook orderBook = orderBookService.getOrderBook();
-    Assertions.assertNotNull(orderBook);
-    orderBook.sellOrders().forEach(System.out::println);
-    System.out.println();
+  public void SELL_ORDER_MIN_VALUE_FIRST_AFTER_POLL_TEST() {
+    // Creating a copy to avoid breaking other tests
+    PriorityQueue<Order> copyOfSellOrders = new PriorityQueue<>(orderBookService.getOrderBook().sellOrders());
 
     for (int i = 0; i < 3; i++) {
-      orderBook.sellOrders().poll();
-      orderBook.sellOrders().forEach(System.out::println);
-      System.out.println();
+      copyOfSellOrders.poll();
     }
+
+    Order firstInQueue = copyOfSellOrders.peek();
+    Assertions.assertNotNull(firstInQueue);
+
+    int minPrice = firstInQueue.price();
+    boolean lowerPriceFound = copyOfSellOrders.stream().anyMatch(order -> order.price() > minPrice);
+    Assertions.assertFalse(lowerPriceFound);
   }
 }
