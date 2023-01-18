@@ -8,7 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import za.co.rmb.orderbook.model.Order;
 import za.co.rmb.orderbook.model.OrderBook;
 
-import java.util.PriorityQueue;
+import java.util.*;
 
 @SpringBootTest
 public class OrderBookServiceTest {
@@ -20,75 +20,72 @@ public class OrderBookServiceTest {
   public void checkForNull() {
     OrderBook orderBook = orderBookService.getOrderBook();
     Assertions.assertNotNull(orderBook);
+    orderBookService.init();
+    Assertions.assertNotNull(orderBook.buyOrdersMap());
+    Assertions.assertNotNull(orderBook.sellOrdersMap());
   }
 
-  /**
-   * In the buy order queue the price at the beginning of the queue should be the highest.
-   */
   @Test
-  public void BUY_ORDER_MAX_QUEUE_TEST() {
-    // Creating a copy to avoid breaking other tests
-    PriorityQueue<Order> copyOfBuyOrders = new PriorityQueue<>(orderBookService.getOrderBook().buyOrders());
-    Order firstInQueue = copyOfBuyOrders.peek();
-    Assertions.assertNotNull(firstInQueue);
+  public void BUY_ORDER_MAP_IN_DESCENDING_ORDER_TEST() {
+    Map<Integer, Set<Order>> buyOrdersMap = orderBookService.getOrderBook().buyOrdersMap();
+    Assertions.assertNotNull(buyOrdersMap);
 
-    int maxPrice = firstInQueue.price();
-    boolean higherPriceFound = copyOfBuyOrders.stream().anyMatch(order -> order.price() > maxPrice);
-    Assertions.assertFalse(higherPriceFound);
-  }
-
-  /**
-   * In the sell order queue the price at the beginning of the queue should be the lowest.
-   */
-  @Test
-  public void SELL_ORDER_MIN_QUEUE_TEST() {
-    // Creating a copy to avoid breaking other tests
-    PriorityQueue<Order> copyOfSellOrders = new PriorityQueue<>(orderBookService.getOrderBook().sellOrders());
-    Order firstInQueue = copyOfSellOrders.peek();
-    Assertions.assertNotNull(firstInQueue);
-
-    int minPrice = firstInQueue.price();
-    boolean lowerPriceFound = copyOfSellOrders.stream().anyMatch(order -> order.price() < minPrice);
-    Assertions.assertFalse(lowerPriceFound);
-  }
-
-  /**
-   * Test if the highest value of the remaining buy orders is at top after a few buy order have been removed from the queue.
-   */
-  @Test
-  public void BUY_ORDER_MAX_VALUE_FIRST_AFTER_POLL_TEST() {
-    // Creating a copy to avoid breaking other tests
-    PriorityQueue<Order> copyOfBuyOrders = new PriorityQueue<>(orderBookService.getOrderBook().buyOrders());
-
-    for (int i = 0; i < 3; i++) {
-      copyOfBuyOrders.poll();
+    Integer previousKey = null;
+    for (int key: buyOrdersMap.keySet()) {
+      if (previousKey != null) {
+        Assertions.assertTrue(key < previousKey);
+      }
+      previousKey = key;
     }
-
-    Order firstInQueue = copyOfBuyOrders.peek();
-    Assertions.assertNotNull(firstInQueue);
-
-    int maxPrice = firstInQueue.price();
-    boolean higherPriceFound = copyOfBuyOrders.stream().anyMatch(order -> order.price() > maxPrice);
-    Assertions.assertFalse(higherPriceFound);
   }
 
-  /**
-   * Test if the lowest value of the remaining sell orders is at top after a few buy order have been removed from the queue.
-   */
   @Test
-  public void SELL_ORDER_MIN_VALUE_FIRST_AFTER_POLL_TEST() {
-    // Creating a copy to avoid breaking other tests
-    PriorityQueue<Order> copyOfSellOrders = new PriorityQueue<>(orderBookService.getOrderBook().sellOrders());
+  public void SELL_ORDER_MAP_IN_ASCENDING_ORDER_TEST() {
+    Map<Integer, Set<Order>> sellOrdersMap = orderBookService.getOrderBook().sellOrdersMap();
+    Assertions.assertNotNull(sellOrdersMap);
 
-    for (int i = 0; i < 3; i++) {
-      copyOfSellOrders.poll();
+    Integer previousKey = null;
+    for (int key: sellOrdersMap.keySet()) {
+      if (previousKey != null) {
+        Assertions.assertTrue(key > previousKey);
+      }
+      previousKey = key;
     }
+  }
 
-    Order firstInQueue = copyOfSellOrders.peek();
-    Assertions.assertNotNull(firstInQueue);
+  @Test
+  public void BUY_ORDER_MAP_IN_DESCENDING_ORDER_AFTER_FIRST_ENTRY_REMOVED_TEST() {
+    Map<Integer, Set<Order>> buyOrdersMap = orderBookService.getOrderBook().buyOrdersMap();
 
-    int minPrice = firstInQueue.price();
-    boolean lowerPriceFound = copyOfSellOrders.stream().anyMatch(order -> order.price() > minPrice);
-    Assertions.assertFalse(lowerPriceFound);
+    Integer firstKey = buyOrdersMap.keySet().stream().findFirst().orElse(null);
+    Assertions.assertNotNull(firstKey);
+
+    buyOrdersMap.remove(firstKey);
+
+    Integer previousKey = null;
+    for (int key: buyOrdersMap.keySet()) {
+      if (previousKey != null) {
+        Assertions.assertTrue(key < previousKey);
+      }
+      previousKey = key;
+    }
+  }
+
+  @Test
+  public void SELL_ORDER_MAP_IN_ASCENDING_ORDER_AFTER_FIRST_ENTRY_REMOVED_TEST() {
+    Map<Integer, Set<Order>> sellOrdersMap = orderBookService.getOrderBook().sellOrdersMap();
+
+    Integer firstKey = sellOrdersMap.keySet().stream().findFirst().orElse(null);
+    Assertions.assertNotNull(firstKey);
+
+    sellOrdersMap.remove(firstKey);
+
+    Integer previousKey = null;
+    for (int key: sellOrdersMap.keySet()) {
+      if (previousKey != null) {
+        Assertions.assertTrue(key < previousKey);
+      }
+      previousKey = key;
+    }
   }
 }

@@ -2,45 +2,69 @@ package za.co.rmb.orderbook.service;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
-import za.co.rmb.orderbook.enums.Side;
+import za.co.rmb.orderbook.enumerator.Side;
 import za.co.rmb.orderbook.model.Order;
 import za.co.rmb.orderbook.model.OrderBook;
+import za.co.rmb.orderbook.repository.OrderRepository;
 
-import java.time.LocalTime;
-import java.util.PriorityQueue;
-import java.util.Queue;
+import java.util.*;
+
 
 @Service
 public class OrderBookService {
 
+  private final OrderRepository orderRepository;
+
   private OrderBook orderBook = null;
+
+  public OrderBookService(OrderRepository orderRepository) {
+    this.orderRepository = orderRepository;
+  }
 
   @PostConstruct
   public void init() {
+    // Note comment in the getOrdersFromDatabase method
+    Set<Order> ordersFromDatabase = orderRepository.getOrdersFromDatabase();
+
     /*
-     * NOTE:
-     * 1. Using a queue data structure because the limit order book has the priority: FIFO.
-     *    The order at the top will be processed first, and removed from the queue.
-     * 2. Using PriorityQueue (heap implementation) because it provides O(log n) time complexity
-     *    for the enqueuing and dequeuing methods (offer, poll, remove() and add);
-     *    linear time for the remove(Object) and contains(Object) methods;
-     *    and constant time for the retrieval methods (peek, element, and size).
-     */
-    Queue<Order> buyOrders = new PriorityQueue<>();
-    buyOrders.add(new Order(101L, 33, 10, Side.BUY, LocalTime.of(12, 3,18)));
-    buyOrders.add(new Order(102L, 33, 5, Side.BUY, LocalTime.of(11, 30,1)));
-    buyOrders.add(new Order(103L, 34, 7, Side.BUY, LocalTime.of(12, 0,22)));
-    buyOrders.add(new Order(104L, 35, 12, Side.BUY, LocalTime.of(13, 50,45)));
-    buyOrders.add(new Order(105L, 34, 14, Side.BUY, LocalTime.of(13, 24,23)));
+      1. Using a Map inorder to group orders per price level (as illustrated in the example limit order book table).
+      2. Using TreeMap to maintain ascending/descending order based on price level. Sell side maintains ascending order
+         and buy side maintains descending order based on price level.
+      3. Basic operation (containsKey, get, put and remove) at log(n) time cost.
+    */
+    Map<Integer, Set<Order>> sellOrderMap = new TreeMap<>();
+    Map<Integer, Set<Order>> buyOrderMap = new TreeMap<>(Collections.reverseOrder());
 
-    Queue<Order> sellOrders = new PriorityQueue<>();
-    sellOrders.add(new Order(106L, 30, 6, Side.SELL, LocalTime.of(9, 31,59)));
-    sellOrders.add(new Order(107L, 35, 9, Side.SELL, LocalTime.of(10, 14,16)));
-    sellOrders.add(new Order(108L, 35, 11, Side.SELL, LocalTime.of(12, 44,36)));
-    sellOrders.add(new Order(109L, 29, 8, Side.SELL, LocalTime.of(14, 16,46)));
-    sellOrders.add(new Order(110L, 30, 10, Side.SELL, LocalTime.of(10, 33,21)));
+    // Using streams for filter BUY / SELL because java can perform both operations in parallel, therefore improving performance
+    if (ordersFromDatabase != null) {
+      ordersFromDatabase.stream().filter(order -> order != null && order.side() == Side.BUY)
+          .forEach(order -> {
+            Set<Order> buyOrderQueue = buyOrderMap.get(order.price());
+            if (buyOrderQueue == null) {
+              /*
+                Using TreeSet because we need to maintain ascending order in terms of time. Not using PriorityQueue because
+                It only guarantees min/max value at the top but does not necessarily maintain ascending order.
+                TreeSet provides guaranteed log(n) time cost for the basic operations (add, remove and contains).
+              */
+              buyOrderQueue = new TreeSet<>();
+            }
+            buyOrderQueue.add(order);
+            buyOrderMap.put(order.price(), buyOrderQueue);
+          });
 
-    this.orderBook = new OrderBook(buyOrders, sellOrders);
+      ordersFromDatabase.stream().filter(order -> order != null && order.side() == Side.SELL)
+          .forEach(order -> {
+            Set<Order> sellOrderQueue = sellOrderMap.get(order.price());
+            if (sellOrderQueue == null) {
+              // Above comment applies...
+              sellOrderQueue = new TreeSet<>();
+            }
+            sellOrderQueue.add(order);
+            sellOrderMap.put(order.price(), sellOrderQueue);
+          });
+    }
+
+    this.orderBook = new OrderBook(buyOrderMap, sellOrderMap);
   }
 
   public OrderBook getOrderBook() {
